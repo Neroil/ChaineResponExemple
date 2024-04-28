@@ -52,7 +52,9 @@ abstract class AttackHandler {
     }
 
     public void handleAttackRequest(Request request){
-        this._successor.handleAttackRequest(request);
+        if(this._successor != null) {
+            this._successor.handleAttackRequest(request);
+        }
     }
 }
 
@@ -70,11 +72,28 @@ class PhysicalAttackHandler extends AttackHandler {
     public void handleAttackRequest(Request request) {
         if (request.getKind() == Kind.PhysicalAttack) {
             // Handle the request here
-        } else if (_successor != null) {
-            _successor.handleAttackRequest(request);
-        }
+        } else super.handleAttackRequest(request);
     }
 }
+
+class RangeCheckerHandler extends AttackHandler{
+
+    @Override
+    public void handleAttackRequest(Request request){
+        // Check la range
+        super.handleAttackRequest(request);
+    }
+}
+
+class ManaCheckerHandler extends AttackHandler{
+
+    @Override
+    public void handleAttackRequest(Request request){
+        // Check la mana
+        super.handleAttackRequest(request);
+    }
+}
+
 
 class MagicalAttackHandler extends AttackHandler {
 
@@ -88,10 +107,16 @@ class MagicalAttackHandler extends AttackHandler {
 
     @Override
     public void handleAttackRequest(Request request) {
-        if (request.getKind() == Kind.MagicalAttack) {
-            // Handle the request here
-        } else if (_successor != null) {
-            _successor.handleAttackRequest(request);
+        switch(request.getKind()){
+            case MagicalAttack:
+                // Send to Magical Attack Handler
+
+                break;
+            case PhysicalAttack:
+                // Send to Physical Attack Handler
+                break;
+            default:
+                super.handleAttackRequest(request);
         }
     }
 }
