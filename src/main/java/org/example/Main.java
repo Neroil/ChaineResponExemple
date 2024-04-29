@@ -39,29 +39,53 @@ class Request {
     }
 }
 
+class AttackRequest {
+    private Person p;
+
+    public int getMana(){
+        return p.getMana();
+    }
+
+
+
+    RangeCheckerHandler r = new RangeCheckerHandler()
+            .setSuccessor(new ManaCheckerHandler())
+            .setSuccessor(new TypeAttackHandler());
+
+    if(r.handleAttackRequest(request)){
+        //attaque reussie
+    }else{
+        //attaque ratée
+    }
+
+
+}
+
 
 abstract class AttackHandler {
     protected AttackHandler _successor;
-
-    public AttackHandler(AttackHandler _successor){
-        this._successor = _successor;
-    }
 
     public AttackHandler(){
         this._successor = null;
     }
 
-    public void handleAttackRequest(Request request){
+    public AttackHandler setSuccessor(AttackHandler _successor){
+        this._successor = _successor;
+        return _successor;
+    }
+
+    public boolean handleAttackRequest(Request request){
         if(this._successor != null) {
-            this._successor.handleAttackRequest(request);
+            return this._successor.handleAttackRequest(request);
         }
+        return true; //If there was nothing stopping us from attacking :p
     }
 }
 
 class PhysicalAttackHandler extends AttackHandler {
 
-    public PhysicalAttackHandler(AttackHandler _successor){
-        super(_successor);
+    public PhysicalAttackHandler(){
+        super();
     }
 
     public PhysicalAttackHandler(){
@@ -69,28 +93,51 @@ class PhysicalAttackHandler extends AttackHandler {
     }
 
     @Override
-    public void handleAttackRequest(Request request) {
+    public boolean handleAttackRequest() {
         if (request.getKind() == Kind.PhysicalAttack) {
             // Handle the request here
-        } else super.handleAttackRequest(request);
+        } else super.handleAttackRequest();
     }
 }
 
 class RangeCheckerHandler extends AttackHandler{
 
+    public boolean rangeValid(Request request){
+        // Check range
+        return true;
+    }
+
+    public RangeCheckerHandler() {
+        super();
+    }
+
     @Override
-    public void handleAttackRequest(Request request){
-        // Check la range
-        super.handleAttackRequest(request);
+    public boolean handleAttackRequest(Request request){
+        if(rangeValid(request)){
+            return super.handleAttackRequest(request);
+        }
+        return false;
     }
 }
 
 class ManaCheckerHandler extends AttackHandler{
 
+
+    public boolean haveEnoughMana(Request request){
+        // Check if have enough mana
+        return true;
+    }
+
+    public ManaCheckerHandler() {
+        super();
+    }
+
     @Override
-    public void handleAttackRequest(Request request){
-        // Check la mana
-        super.handleAttackRequest(request);
+    public boolean handleAttackRequest(Request request){
+        if(haveEnoughMana(request)){
+            return super.handleAttackRequest(request);
+        }
+        return false;
     }
 }
 
@@ -133,8 +180,13 @@ class Person {
     }
 
     public void attack(Person p){
-        Request request = new Request(Kind.PhysicalAttack);
-        handler.handleAttackRequest(request);
+        if (!handler.handleAttackRequest(getRequest())){
+            System.out.println(this + " couldn't attack :(");
+        }
+    }
+
+    private Request getRequest(){
+        return new Request(Kind.PhysicalAttack);
     }
 }
 
@@ -149,8 +201,7 @@ class Mage extends Person{
     }
 
     @Override
-    public void attack(Person p){
-        Request request = new Request(Kind.MagicalAttack);
-        handler.handleAttackRequest(request);
+    private Request getRequest(){
+        return new Request(Kind.MagicalAttack);
     }
 }

@@ -1,127 +1,175 @@
 package org.example.hihi;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class main2 {
     public static void main(String[] args) {
-        AttackHandler physicalAttackHandler = new PhysicalAttackHandler(null);
-        AttackHandler magicalAttackHandler = new MagicalAttackHandler(physicalAttackHandler);
+        // Set up the chain of responsibility
+        AttackHandler physicalAttackHandler = new PhysicalAttackHandler();
+        AttackHandler rangeCheckerHandler = new RangeCheckerHandler();
+        AttackHandler manaCheckerHandler = new ManaCheckerHandler();
+        AttackHandler magicalAttackHandler = new MagicalAttackHandler();
 
-        Person[] fightingRing = new Person[3];
+        rangeCheckerHandler.setSuccessor(manaCheckerHandler);
+        manaCheckerHandler.setSuccessor(physicalAttackHandler);
+        physicalAttackHandler.setSuccessor(magicalAttackHandler);
 
-        Person gimli = new Person(physicalAttackHandler);
-        Mage saruman = new Mage(magicalAttackHandler);
+        // Create fighters
+        List<Fighter> fighters = new ArrayList<>();
+        fighters.add(new Warrior(rangeCheckerHandler));
+        fighters.add(new Mage(rangeCheckerHandler));
 
-        fightingRing[0] = gimli;
-        fightingRing[2] = saruman;
-
-        gimli.attack(saruman); // Physical attack request, will be handled
-        saruman.attack(gimli); // Magical attack request, will be handled
-
-        fightingRing[1] = gimli;
+        // Simulate attacks
+        fighters.get(0).attack(fighters.get(1)); // Warrior attacks Mage (should succeed)
+        fighters.get(1).attack(fighters.get(0)); // Mage attacks Warrior (should succeed)
     }
 }
 
-enum Kind {
-    MagicalAttack,
-    PhysicalAttack
+enum AttackType {
+    PHYSICAL,
+    MAGICAL
 }
 
-class Request {
-    private Kind requestKind;
+class AttackRequest {
+    private AttackType type;
+    private Fighter source;
+    private Fighter target;
 
-    public Request(Kind requestKind) {
-        this.requestKind = requestKind;
+    public AttackRequest(AttackType type, Fighter source, Fighter target) {
+        this.type = type;
+        this.source = source;
+        this.target = target;
     }
 
-    public Kind getKind() {
-        return requestKind;
+    public AttackType getType() {
+        return type;
+    }
+
+    public Fighter getSource() {
+        return source;
+    }
+
+    public Fighter getTarget() {
+        return target;
     }
 }
 
 abstract class AttackHandler {
     private AttackHandler successor;
 
-    public AttackHandler(AttackHandler successor) {
+    public void setSuccessor(AttackHandler successor) {
         this.successor = successor;
     }
 
-    public void handleAttackRequest(Request request) {
-        if (canHandleRequest(request)) {
-            handleRequest(request);
-        } else if (successor != null) {
-            successor.handleAttackRequest(request);
+    public abstract boolean handleRequest(AttackRequest request);
+
+    protected boolean invokeSuccessor(AttackRequest request) {
+        if (successor != null) {
+            return successor.handleRequest(request);
+        }
+        return true; // End of the chain, attack succeeds
+    }
+}
+
+class RangeCheckerHandler extends AttackHandler {
+    @Override
+    public boolean handleRequest(AttackRequest request) {
+        // Check if the source and target are in range
+        boolean inRange = true; // Implement your range check logic here
+
+        if (inRange) {
+            return invokeSuccessor(request);
         } else {
-            // No handler available for the request
+            System.out.println("Target is out of range!");
+            return false;
         }
     }
+}
 
-    protected abstract boolean canHandleRequest(Request request);
-    protected abstract void handleRequest(Request request);
+class ManaCheckerHandler extends AttackHandler {
+    @Override
+    public boolean handleRequest(AttackRequest request) {
+        Fighter source = request.getSource();
+        if (source.getMana() < 10) {
+            System.out.println("Not enough mana!");
+            return false;
+        }
+        return invokeSuccessor(request);
+    }
 }
 
 class PhysicalAttackHandler extends AttackHandler {
-    public PhysicalAttackHandler(AttackHandler successor) {
-        super(successor);
-    }
-
     @Override
-    protected boolean canHandleRequest(Request request) {
-        return request.getKind() == Kind.PhysicalAttack;
-    }
-
-    @Override
-    protected void handleRequest(Request request) {
-        // Handle the physical attack request here
-        System.out.println("Handling physical attack request");
+    public boolean handleRequest(AttackRequest request) {
+        if (request.getType() == AttackType.PHYSICAL) {
+            System.out.println("Physical attack succeeded!");
+            return true;
+        }
+        return invokeSuccessor(request);
     }
 }
 
 class MagicalAttackHandler extends AttackHandler {
-    public MagicalAttackHandler(AttackHandler successor) {
-        super(successor);
-    }
-
     @Override
-    protected boolean canHandleRequest(Request request) {
-        return request.getKind() == Kind.MagicalAttack;
-    }
-
-    @Override
-    protected void handleRequest(Request request) {
-        // Handle the magical attack request here
-        System.out.println("Handling magical attack request");
+    public boolean handleRequest(AttackRequest request) {
+        if (request.getType() == AttackType.MAGICAL) {
+            System.out.println("Magical attack succeeded!");
+            return true;
+        }
+        return false; // End of the chain, attack fails
     }
 }
 
-class Person {
-    protected AttackHandler handler;
+abstract class Fighter {
+    private AttackHandler handler;
 
-    public Person(AttackHandler handler) {
+    public Fighter(AttackHandler handler) {
         this.handler = handler;
     }
 
-    public int getMana() {
-        return 0;
+    public abstract int getMana();
+
+    public void attack(Fighter target) {
+        AttackRequest request = new AttackRequest(getAttackType(), this, target);
+        if (!handler.handleRequest(request)) {
+            System.out.println(this + " couldn't attack " + target);
+        }
     }
 
-    public void attack(Person p) {
-        Request request = new Request(Kind.PhysicalAttack);
-        handler.handleAttackRequest(request);
+    protected abstract AttackType getAttackType();
+}
+
+class Warrior extends Fighter {
+    public Warrior(AttackHandler handler) {
+        super(handler);
+    }
+
+    @Override
+    public int getMana() {
+        return 0; // Warriors don't have mana
+    }
+
+    @Override
+    protected AttackType getAttackType() {
+        return AttackType.PHYSICAL;
     }
 }
 
-class Mage extends Person {
+class Mage extends Fighter {
+    private final int MANA = 100;
+
     public Mage(AttackHandler handler) {
         super(handler);
     }
 
     @Override
     public int getMana() {
-        return 100;
+        return MANA;
     }
 
     @Override
-    public void attack(Person p) {
-        Request request = new Request(Kind.MagicalAttack);
-        handler.handleAttackRequest(request);
+    protected AttackType getAttackType() {
+        return AttackType.MAGICAL;
     }
 }
