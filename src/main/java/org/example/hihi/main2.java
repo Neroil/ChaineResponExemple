@@ -7,22 +7,29 @@ public class main2 {
     public static void main(String[] args) {
         // Set up the chain of responsibility
         AttackHandler physicalAttackHandler = new PhysicalAttackHandler();
-        AttackHandler rangeCheckerHandler = new RangeCheckerHandler();
-        AttackHandler manaCheckerHandler = new ManaCheckerHandler();
-        AttackHandler magicalAttackHandler = new MagicalAttackHandler();
+        AttackHandler rangeCheckerHandler   = new RangeCheckerHandler();
+        AttackHandler manaCheckerHandler    = new ManaCheckerHandler();
+        AttackHandler staminaCheckerHandler = new StaminaCheckerHandler();
+        AttackHandler magicalAttackHandler  = new MagicalAttackHandler();
 
-        rangeCheckerHandler.setSuccessor(manaCheckerHandler);
-        manaCheckerHandler.setSuccessor(physicalAttackHandler);
-        physicalAttackHandler.setSuccessor(magicalAttackHandler);
+        physicalAttackHandler.setSuccessor(rangeCheckerHandler)
+                             .setSuccessor(staminaCheckerHandler);
+
+        magicalAttackHandler.setSuccessor(manaCheckerHandler);
 
         // Create fighters
         List<Fighter> fighters = new ArrayList<>();
-        fighters.add(new Warrior(rangeCheckerHandler));
-        fighters.add(new Mage(rangeCheckerHandler));
+        // Assign the designated chain to each character (? unsure)
+        fighters.add(new Warrior(physicalAttackHandler));
+        fighters.add(new Mage(magicalAttackHandler));
 
         // Simulate attacks
+        System.out.println("Warrior is attacking :");
         fighters.get(0).attack(fighters.get(1)); // Warrior attacks Mage (should succeed)
+        System.out.println("\nMage is attacking :");
         fighters.get(1).attack(fighters.get(0)); // Mage attacks Warrior (should succeed)
+        System.out.println("\nMage is attacking :");
+        fighters.get(1).attack(fighters.get(0)); // No more mana, should fail
     }
 }
 
@@ -32,9 +39,9 @@ enum AttackType {
 }
 
 class AttackRequest {
-    private AttackType type;
-    private Fighter source;
-    private Fighter target;
+    private final AttackType type;
+    private final Fighter source;
+    private final Fighter target;
 
     public AttackRequest(AttackType type, Fighter source, Fighter target) {
         this.type = type;
@@ -58,8 +65,9 @@ class AttackRequest {
 abstract class AttackHandler {
     private AttackHandler successor;
 
-    public void setSuccessor(AttackHandler successor) {
+    public AttackHandler setSuccessor(AttackHandler successor) {
         this.successor = successor;
+        return successor;
     }
 
     public abstract boolean handleRequest(AttackRequest request);
@@ -68,6 +76,7 @@ abstract class AttackHandler {
         if (successor != null) {
             return successor.handleRequest(request);
         }
+        System.out.println("All handler passed!");
         return true; // End of the chain, attack succeeds
     }
 }
@@ -76,14 +85,28 @@ class RangeCheckerHandler extends AttackHandler {
     @Override
     public boolean handleRequest(AttackRequest request) {
         // Check if the source and target are in range
-        boolean inRange = true; // Implement your range check logic here
+        boolean inRange = true;
 
         if (inRange) {
+            System.out.println("Range handler passed! ");
             return invokeSuccessor(request);
         } else {
             System.out.println("Target is out of range!");
             return false;
         }
+    }
+}
+
+class StaminaCheckerHandler extends AttackHandler {
+    @Override
+    public boolean handleRequest(AttackRequest request) {
+        Fighter source = request.getSource();
+        if (source.getStamina() < 10) {
+            System.out.println("Not enough stamina!");
+            return false;
+        }
+        System.out.println("Stamina handler passed!");
+        return invokeSuccessor(request);
     }
 }
 
@@ -95,6 +118,7 @@ class ManaCheckerHandler extends AttackHandler {
             System.out.println("Not enough mana!");
             return false;
         }
+        System.out.println("Mana handler passed!");
         return invokeSuccessor(request);
     }
 }
@@ -103,10 +127,10 @@ class PhysicalAttackHandler extends AttackHandler {
     @Override
     public boolean handleRequest(AttackRequest request) {
         if (request.getType() == AttackType.PHYSICAL) {
-            System.out.println("Physical attack succeeded!");
-            return true;
+            System.out.println("Physical attack handler passed!");
+            return invokeSuccessor(request);
         }
-        return invokeSuccessor(request);
+        return false;
     }
 }
 
@@ -114,21 +138,24 @@ class MagicalAttackHandler extends AttackHandler {
     @Override
     public boolean handleRequest(AttackRequest request) {
         if (request.getType() == AttackType.MAGICAL) {
-            System.out.println("Magical attack succeeded!");
-            return true;
+            System.out.println("Magical attack handler passed!");
+            return invokeSuccessor(request);
         }
-        return false; // End of the chain, attack fails
+        return false;
     }
 }
 
+
 abstract class Fighter {
-    private AttackHandler handler;
+    private final AttackHandler handler;
 
     public Fighter(AttackHandler handler) {
         this.handler = handler;
     }
 
     public abstract int getMana();
+
+    public abstract int getStamina();
 
     public void attack(Fighter target) {
         AttackRequest request = new AttackRequest(getAttackType(), this, target);
@@ -137,10 +164,17 @@ abstract class Fighter {
         }
     }
 
+    public String toString(){
+        return getClass().getSimpleName();
+    }
+
     protected abstract AttackType getAttackType();
 }
 
 class Warrior extends Fighter {
+
+    private int stamina = 100;
+
     public Warrior(AttackHandler handler) {
         super(handler);
     }
@@ -151,13 +185,19 @@ class Warrior extends Fighter {
     }
 
     @Override
+    public int getStamina() {
+        return stamina;
+    }
+
+    @Override
     protected AttackType getAttackType() {
         return AttackType.PHYSICAL;
     }
 }
 
 class Mage extends Fighter {
-    private final int MANA = 100;
+
+    private int mana = 100;
 
     public Mage(AttackHandler handler) {
         super(handler);
@@ -165,11 +205,22 @@ class Mage extends Fighter {
 
     @Override
     public int getMana() {
-        return MANA;
+        return mana;
+    }
+
+    @Override
+    public int getStamina() {
+        return 0; // Mage don't have stamina
     }
 
     @Override
     protected AttackType getAttackType() {
         return AttackType.MAGICAL;
+    }
+
+    @Override
+    public void attack(Fighter target) {
+        super.attack(target);
+        mana -= 100;
     }
 }
